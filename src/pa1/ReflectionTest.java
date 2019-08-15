@@ -7,17 +7,21 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Scanner;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
 
 public class ReflectionTest {
 	static JUnitCore junitCore;
+	static String testFile;
 	
 	public static void main(String[] args) throws InstantiationException, IllegalAccessException {
 		/*
@@ -31,16 +35,32 @@ public class ReflectionTest {
 		System.out.println("Successful: " + result.wasSuccessful() + "ran" + result.getRunCount() + "tests");
 		*/
 		ArrayList<Class<?>> classes = getClasses("pa1");
+		testFile = "package pa1;\r\n\r\n" + 
+			"import static org.junit.Assert.*;\r\n\r\n" + 
+			"import org.junit.After;\r\n" + 
+			"import org.junit.AfterClass;\r\n" + 
+			"import org.junit.Before;\r\n" + 
+			"import org.junit.BeforeClass;\r\n" + 
+			"import org.junit.Test;\r\n" + 
+			"import org.junit.Rule;\r\n" + 
+			"import org.junit.rules.Timeout;\r\n\r\n" + 
+			"import java.lang.reflect.Constructor;\r\n" + 
+			"import java.lang.reflect.Field;\r\n" + 
+			"import java.lang.reflect.Method;\r\n\r\n" + 
+			"public class UnitTest \r\n" + 
+			"{\r\n\t@Rule\r\n\tpublic Timeout globalTimeout = Timeout.seconds(3);\n\n";
 		Class<?> c = classes.get(12);
-		// String result = classToJSON(c);
+		String result = classToJSON(c);
+		System.out.println(testFile);
 		// System.out.println(setField("health", "archer", 10));
 		// System.out.println(invokeMethod("moveDelta", "archer", 0, 0));
 		// String temp = aEqual(1, "locationX.getInt(archer)");
-		String temp = setField("health", "archer", "i") + "\n";
-		String temp2 = invokeMethod("heal", "archer") + "\n";
-		String temp3 = aEqual("i + 3", getField("health", "archer"));
+		// String temp = setField("health", "archer", "i");
+		// String temp2 = invokeMethod("heal", "archer");
+		// String temp3 = aEqual("i + 3", getField("health", "archer"));
 		
-		System.out.println(forLoop("i", 0, 7, temp, temp2, temp3));
+		// System.out.println(forLoop("i", 0, 7, temp, temp2, temp3));
+		System.out.println(genTestCase());
 	}
 	
 	public static final ArrayList<Class<?>> getClasses(String packageName) {
@@ -86,6 +106,9 @@ public class ReflectionTest {
 	}
 	
 	public static String classToJSON(Class<?> cla) {
+		String className = cla.getName();
+		String rules = "";
+		String beforeClass = "\t@BeforeClass\r\n\tpublic static void setUpBeforeClass() throws Exception\r\n\t{";
 		JSONObject json = new JSONObject();
 		JSONArray conJSON = new JSONArray();
 		JSONObject fieldJSON = new JSONObject();
@@ -108,8 +131,13 @@ public class ReflectionTest {
 
 		for (Field f : fld) {
 			fieldJSON.put(f.getName(), f.getType().getName());
+			rules += "\tstatic Field " + f.getName() + ";\n";
+			beforeClass += "\n\t\t" + f.getName() + " = " + className + ".class.getDeclaredField(\"" + f.getName() + "\""
+				+ ");\n\t\t" + f.getName() + ".setAccessible(true);";
 		}
 
+		rules += "\n";
+		
 		for (Method m : method) {
 			ArrayList<String> dummy = new ArrayList<String>();
 
@@ -119,21 +147,31 @@ public class ReflectionTest {
 				dummy.add(temp.substring(0, temp.length() - 5));
 			}
 			methodJSON.put(m.getName(), dummy);
+			rules += "\n\tstatic Method " + m.getName() + ";";
+			beforeClass += "\n\t\t" + m.getName() + " = " + className + ".class.getDeclaredMethod(\"" + m.getName() + "\"";
+			for (String d : dummy) {
+				beforeClass += ", " + d + ".class";
+			}
+			beforeClass += ");\n\t\t" + m.getName() + ".setAccessible(true);";
 		}
 		
-		json.put("name", cla.getName());
-		json.put("constructor", conJSON);
-		json.put("field", fieldJSON);
-		json.put("method", methodJSON);
+		rules += "\n\n";
+		beforeClass += "\n\t}";
+		testFile += rules + beforeClass + "\n}";
+		
+		json.put("Name", cla.getName());
+		json.put("Constructor", conJSON);
+		json.put("Field", fieldJSON);
+		json.put("Method", methodJSON);
 		return json.toString();
 	}
 	
 	public static <T> String setField(String fieldName, String objectName, T value) {
-		return fieldName + ".set(" + objectName + ", " + value + ");";
+		return fieldName + ".set(" + objectName + ", " + value + ")";
 	}
 	
 	public static <T> String getField(String fieldName, String objectName) {
-		return fieldName + ".get(" + objectName + ");";
+		return fieldName + ".get(" + objectName + ")";
 	}
 	
 	public static <T> String invokeMethod(String methodName, String objectName, T... value) {
@@ -141,29 +179,71 @@ public class ReflectionTest {
 		for (T t : value) {
 			result += ", " + t;
 		}
-		result += ");";
+		result += ")";
 		return result; 
 	}
 	
 	public static <T> String aEqual(T value, String secondValue) {
-		return "assertEquals(" + value + ", " + secondValue + ");";
+		return "assertEquals(" + value + ", " + secondValue + ")";
 	}
 	
 	public static <T> String aTrue(String stmt) {
-		return "assertTrue(" + stmt + ");";
+		return "assertTrue(" + stmt + ")";
 	}
 	
 	public static <T> String aFalse(String stmt) {
-		return "assertFalse(" + stmt + ");";
+		return "assertFalse(" + stmt + ")";
 	}
 	
 	public static <T> String forLoop(String name, int bot, int top, String... stmt) {
 		String template = "for (int " + name + " = " + bot + "; " + name + " <= " + top + "; "
 				+ name + "++) {";
 		for (String s : stmt) {
-			template += "\n\t" + s;
+			template += "\n\t" + s + ";";
 		}
 		
 		return template + "\n}";
+	}
+	
+	public static String genTestCase() {
+		String result = "";
+		Scanner sc = new Scanner(System.in);
+		boolean dnd = true;
+		System.out.print("Input name of test case: ");
+		String name = sc.next();
+		result += "@Test\r\npublic void " + name + "() throws Exception\r\n{\r\n";
+		
+		while (dnd) {
+			System.out.println("Action? ");
+			int choice = sc.nextInt();
+			switch (choice) {
+				case 1:
+					System.out.println("setfield");
+					System.out.print("Input field name, object name, value: ");
+					String fName = sc.next();
+					String oName = sc.next();
+					String v = sc.next();
+					String sField = setField(fName, oName, v);
+					result += "\t" + sField + ";";
+					break;
+				case 2:
+					System.out.println("getfield");
+					System.out.print("Input field name, object name: ");
+					String fName1 = sc.next();
+					String oName1 = sc.next();
+					String gField = getField(fName1, oName1);
+					result += "\t" + gField + ";";
+					break;
+				case 8:
+					dnd = false;
+					break;
+				default:
+					break;
+			}
+		}
+		
+		result += "\r\n}";
+		sc.close();
+		return result;
 	}
 }
