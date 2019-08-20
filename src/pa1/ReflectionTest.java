@@ -7,11 +7,15 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -22,6 +26,7 @@ import org.junit.runner.notification.Failure;
 public class ReflectionTest {
 	static JUnitCore junitCore;
 	static String testFile;
+	static Map<String, JSONArray> map = new HashMap<String, JSONArray>();
 	
 	public static void main(String[] args) throws InstantiationException, IllegalAccessException {
 		/*
@@ -34,7 +39,8 @@ public class ReflectionTest {
 		}
 		System.out.println("Successful: " + result.wasSuccessful() + "ran" + result.getRunCount() + "tests");
 		*/
-		ArrayList<Class<?>> classes = getClasses("pa1");
+		
+		System.out.println(directoryReport());
 		testFile = "package pa1;\r\n\r\n" + 
 			"import static org.junit.Assert.*;\r\n\r\n" + 
 			"import org.junit.After;\r\n" + 
@@ -49,9 +55,10 @@ public class ReflectionTest {
 			"import java.lang.reflect.Method;\r\n\r\n" + 
 			"public class UnitTest \r\n" + 
 			"{\r\n\t@Rule\r\n\tpublic Timeout globalTimeout = Timeout.seconds(3);\n\n";
-		Class<?> c = classes.get(12);
-		String result = classToJSON(c);
-		System.out.println(testFile);
+		// Class<?> c = classes.get(8);
+		// System.out.println(classToJSON(c));
+		
+		// System.out.println(testFile);
 		// System.out.println(setField("health", "archer", 10));
 		// System.out.println(invokeMethod("moveDelta", "archer", 0, 0));
 		// String temp = aEqual(1, "locationX.getInt(archer)");
@@ -60,7 +67,7 @@ public class ReflectionTest {
 		// String temp3 = aEqual("i + 3", getField("health", "archer"));
 		
 		// System.out.println(forLoop("i", 0, 7, temp, temp2, temp3));
-		System.out.println(genTestCase());
+		// System.out.println(genTestCase());
 	}
 	
 	public static final ArrayList<Class<?>> getClasses(String packageName) {
@@ -114,9 +121,21 @@ public class ReflectionTest {
 		JSONObject fieldJSON = new JSONObject();
 		JSONObject methodJSON = new JSONObject();
 
+		Class<?> parent = cla.getSuperclass();
 		Constructor<?>[] con = cla.getDeclaredConstructors();
 		Field[] fld = cla.getDeclaredFields();
 		Method[] method = cla.getDeclaredMethods();
+
+		if (parent != null && parent.getName() != "java.lang.Object") {
+			String parentName = parent.getName();
+			if (map.containsKey(parentName)) {
+				JSONArray temp = map.get(parentName);
+				temp.put(className);
+				map.put(parentName, temp);
+			} else {
+				map.put(parentName, new JSONArray(Arrays.asList(className)));
+			}			
+		}
 		
 		for (Constructor<?> c : con) {
 			ArrayList<String> dummy = new ArrayList<String>();
@@ -159,11 +178,36 @@ public class ReflectionTest {
 		beforeClass += "\n\t}";
 		testFile += rules + beforeClass + "\n}";
 		
-		json.put("Name", cla.getName());
 		json.put("Constructor", conJSON);
 		json.put("Field", fieldJSON);
 		json.put("Method", methodJSON);
 		return json.toString();
+	}
+	
+	public static String directoryReport() {
+		JSONObject result = new JSONObject();
+		JSONObject srcJSON = new JSONObject();
+		JSONObject dependency = new JSONObject();
+		ArrayList<Class<?>> classes = getClasses("pa1");
+		String r = "";
+		
+		for (Class<?> c : classes) {
+			//srcJSON.put(c.getName(), classToJSON(c));
+			r += classToJSON(c);
+			System.out.println(r.length());
+		}
+		
+		// System.out.println(srcJSON);
+		System.out.println(r);
+		
+		for (Map.Entry<String, JSONArray> entry : map.entrySet()) {
+		    dependency.put(entry.getKey(), entry.getValue());
+		}
+		
+		System.out.println(dependency);
+		result.put("Dependency", dependency);
+		result.put("Class", srcJSON);
+		return result.toString();
 	}
 	
 	public static <T> String setField(String fieldName, String objectName, T value) {
