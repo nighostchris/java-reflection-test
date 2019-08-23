@@ -1,7 +1,11 @@
 package pa1;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -9,10 +13,14 @@ import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
+import java.util.logging.Logger;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -22,6 +30,19 @@ import org.junit.Test;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
+import org.xml.sax.InputSource;
+
+import com.puppycrawl.tools.checkstyle.Checker;
+import com.puppycrawl.tools.checkstyle.ConfigurationLoader;
+import com.puppycrawl.tools.checkstyle.DefaultLogger;
+import com.puppycrawl.tools.checkstyle.PropertiesExpander;
+import com.puppycrawl.tools.checkstyle.api.AuditListener;
+import com.puppycrawl.tools.checkstyle.api.AutomaticBean;
+import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
+import com.puppycrawl.tools.checkstyle.api.Configuration;
+import com.thoughtworks.qdox.JavaProjectBuilder;
+import com.thoughtworks.qdox.model.JavaPackage;
+import com.thoughtworks.qdox.model.JavaSource;
 
 public class ReflectionTest {
 	static JUnitCore junitCore;
@@ -40,8 +61,10 @@ public class ReflectionTest {
 		System.out.println("Successful: " + result.wasSuccessful() + "ran" + result.getRunCount() + "tests");
 		*/
 		
-		System.out.println(directoryReport());
-		testFile = "package pa1;\r\n\r\n" + 
+		// checkStyle();
+		qdox();
+		// directoryReport();
+		/* testFile = "package pa1;\r\n\r\n" + 
 			"import static org.junit.Assert.*;\r\n\r\n" + 
 			"import org.junit.After;\r\n" + 
 			"import org.junit.AfterClass;\r\n" + 
@@ -54,11 +77,8 @@ public class ReflectionTest {
 			"import java.lang.reflect.Field;\r\n" + 
 			"import java.lang.reflect.Method;\r\n\r\n" + 
 			"public class UnitTest \r\n" + 
-			"{\r\n\t@Rule\r\n\tpublic Timeout globalTimeout = Timeout.seconds(3);\n\n";
-		// Class<?> c = classes.get(8);
-		// System.out.println(classToJSON(c));
-		
-		// System.out.println(testFile);
+			"{\r\n\t@Rule\r\n\tpublic Timeout globalTimeout = Timeout.seconds(3);\n\n"; */
+
 		// System.out.println(setField("health", "archer", 10));
 		// System.out.println(invokeMethod("moveDelta", "archer", 0, 0));
 		// String temp = aEqual(1, "locationX.getInt(archer)");
@@ -69,6 +89,102 @@ public class ReflectionTest {
 		// System.out.println(forLoop("i", 0, 7, temp, temp2, temp3));
 		// System.out.println(genTestCase());
 	}
+	
+	public static void qdox() {
+		File ROOT = new File("src/pa1/");
+		List<File> files = new ArrayList<>();
+        listFiles(files, ROOT, "java");
+        // System.out.println(files);
+        
+        
+		JavaProjectBuilder builder = new JavaProjectBuilder();
+		//List<String> importsArray = new ArrayList<String>();
+		Set<String> importsArray = new HashSet<String>();
+		try {
+			for (File f : files) {
+				JavaSource src = builder.addSource(f);
+				List<String> imports = src.getImports();
+				for (String im : imports) {
+					importsArray.add(im);
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println(importsArray);
+		System.out.println(importsArray.size());
+	}
+	
+	public static void checkStyle() {
+		File ROOT = new File("src/pa1/");
+		List<File> files = new ArrayList<>();
+        listFiles(files, ROOT, "java");
+        
+		ByteArrayOutputStream sos = new ByteArrayOutputStream();
+        AuditListener listener = new DefaultLogger(sos, AutomaticBean.OutputStreamOptions.NONE);
+        
+        File CONF = new File("google_checks.xml");
+		InputSource inputSource = null;
+        try {
+            inputSource = new InputSource(new FileInputStream(CONF));
+        } catch (FileNotFoundException ex) {
+            ex.printStackTrace();
+        }
+        
+        Configuration configuration = null;
+        try {
+            configuration = ConfigurationLoader.loadConfiguration(inputSource,
+                    new PropertiesExpander(System.getProperties()),
+                    ConfigurationLoader.IgnoredModulesOptions.OMIT);
+        } catch (CheckstyleException ex) {
+            ex.printStackTrace();
+        }
+        
+        Checker checker = new Checker();
+        checker.setModuleClassLoader(Checker.class.getClassLoader());
+        try {
+            checker.configure(configuration);
+        } catch (CheckstyleException ex) {
+            ex.printStackTrace();
+        }
+        checker.addListener(listener);
+        
+        int errors = 0;
+        try {
+            errors = checker.process(files);
+        } catch (CheckstyleException ex) {
+            ex.printStackTrace();
+        }
+        System.out.println("Found " + errors + " check style errors.");
+        
+        
+        File outputFile = new File("src/pa1/report.txt");
+		try {
+			PrintWriter writer = new PrintWriter(outputFile);
+			writer.write(sos.toString());
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+        // System.out.println(sos);
+          
+
+        checker.destroy();
+	}
+	
+    private static void listFiles(List<File> files, File folder, String extension) {
+        if (folder.canRead()) {
+            if (folder.isDirectory()) {
+                for (File f : folder.listFiles()) {
+                    listFiles(files, f, extension);
+                }
+            } //else if (folder.toString().contains("Archer"))
+              else if (folder.toString().endsWith("." + extension)) {
+                files.add(folder);
+            }
+        }
+    }
 	
 	public static final ArrayList<Class<?>> getClasses(String packageName) {
 		String path = packageName.replaceAll("\\.", File.separator);
@@ -112,7 +228,7 @@ public class ReflectionTest {
 	    return classes;
 	}
 	
-	public static String classToJSON(Class<?> cla) {
+	public static JSONObject classToJSON(Class<?> cla) {
 		String className = cla.getName();
 		String rules = "";
 		String beforeClass = "\t@BeforeClass\r\n\tpublic static void setUpBeforeClass() throws Exception\r\n\t{";
@@ -181,33 +297,35 @@ public class ReflectionTest {
 		json.put("Constructor", conJSON);
 		json.put("Field", fieldJSON);
 		json.put("Method", methodJSON);
-		return json.toString();
+		return json;
 	}
 	
-	public static String directoryReport() {
+	public static void directoryReport(){
 		JSONObject result = new JSONObject();
 		JSONObject srcJSON = new JSONObject();
 		JSONObject dependency = new JSONObject();
 		ArrayList<Class<?>> classes = getClasses("pa1");
-		String r = "";
 		
 		for (Class<?> c : classes) {
-			//srcJSON.put(c.getName(), classToJSON(c));
-			r += classToJSON(c);
-			System.out.println(r.length());
+			srcJSON.put(c.getName(), classToJSON(c));
 		}
-		
-		// System.out.println(srcJSON);
-		System.out.println(r);
 		
 		for (Map.Entry<String, JSONArray> entry : map.entrySet()) {
 		    dependency.put(entry.getKey(), entry.getValue());
 		}
 		
-		System.out.println(dependency);
+		
 		result.put("Dependency", dependency);
 		result.put("Class", srcJSON);
-		return result.toString();
+		
+		File outputFile = new File("assignment-class.json");
+		try {
+			PrintWriter writer = new PrintWriter(outputFile);
+			writer.write(result.toString());
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public static <T> String setField(String fieldName, String objectName, T value) {

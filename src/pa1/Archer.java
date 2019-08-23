@@ -4,8 +4,8 @@
 
 package pa1;
 
-public class Archer extends Unit 
-{	
+public class Archer extends Unit
+{
 	protected static final int ATTACK_ARCHER = 9;
 	protected static final int DEFENSE_ARCHER = 1;
 	protected static final int ATTACK_RANGE_ARCHER = 5;
