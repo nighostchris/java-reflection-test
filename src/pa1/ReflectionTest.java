@@ -20,7 +20,6 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
-import java.util.logging.Logger;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -41,7 +40,6 @@ import com.puppycrawl.tools.checkstyle.api.AutomaticBean;
 import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import com.puppycrawl.tools.checkstyle.api.Configuration;
 import com.thoughtworks.qdox.JavaProjectBuilder;
-import com.thoughtworks.qdox.model.JavaPackage;
 import com.thoughtworks.qdox.model.JavaSource;
 
 public class ReflectionTest {
@@ -61,8 +59,8 @@ public class ReflectionTest {
 		System.out.println("Successful: " + result.wasSuccessful() + "ran" + result.getRunCount() + "tests");
 		*/
 		
-		// checkStyle();
-		qdox();
+		checkStyle();
+		// getImportedLibraries();
 		// directoryReport();
 		/* testFile = "package pa1;\r\n\r\n" + 
 			"import static org.junit.Assert.*;\r\n\r\n" + 
@@ -90,30 +88,27 @@ public class ReflectionTest {
 		// System.out.println(genTestCase());
 	}
 	
-	public static void qdox() {
+	public static String getImportedLibraries() {
 		File ROOT = new File("src/pa1/");
 		List<File> files = new ArrayList<>();
         listFiles(files, ROOT, "java");
-        // System.out.println(files);
-        
         
 		JavaProjectBuilder builder = new JavaProjectBuilder();
-		//List<String> importsArray = new ArrayList<String>();
-		Set<String> importsArray = new HashSet<String>();
+		Set<String> importsSet = new HashSet<String>();
+		
 		try {
 			for (File f : files) {
 				JavaSource src = builder.addSource(f);
 				List<String> imports = src.getImports();
 				for (String im : imports) {
-					importsArray.add(im);
+					importsSet.add(im);
 				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		
-		System.out.println(importsArray);
-		System.out.println(importsArray.size());
+		return importsSet.toString();
 	}
 	
 	public static void checkStyle() {
@@ -169,7 +164,6 @@ public class ReflectionTest {
 		}
         // System.out.println(sos);
           
-
         checker.destroy();
 	}
 	
@@ -179,8 +173,9 @@ public class ReflectionTest {
                 for (File f : folder.listFiles()) {
                     listFiles(files, f, extension);
                 }
-            } //else if (folder.toString().contains("Archer"))
-              else if (folder.toString().endsWith("." + extension)) {
+            }
+              else if (folder.toString().contains("Archer")) {
+              // else if (folder.toString().endsWith("." + extension)) {
                 files.add(folder);
             }
         }
